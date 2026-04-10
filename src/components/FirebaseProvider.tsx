@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, FirebaseUser, onAuthStateChanged } from '@/lib/firebase';
+import React, { createContext, useContext, useEffect, useState, Component, ReactNode } from 'react';
+import { auth, type FirebaseUser, onAuthStateChanged } from '@/lib/firebase';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -10,7 +10,7 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,8 +29,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
-  state = { hasError: false, error: null };
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -41,6 +53,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   }
 
   render() {
+    const { children } = this.props;
     if (this.state.hasError) {
       let errorMessage = "Something went wrong.";
       if (this.state.error && this.state.error.message) {
@@ -68,6 +81,6 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }

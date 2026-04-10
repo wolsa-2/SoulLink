@@ -1,6 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getApiKey = () => {
+  const key = process.env.GEMINI_API_KEY;
+  if (key && key !== 'undefined' && key !== '') return key;
+  
+  const viteKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+  if (viteKey && viteKey !== 'undefined' && viteKey !== '') return viteKey;
+  
+  return null;
+};
+
+const apiKey = getApiKey();
+if (!apiKey) {
+  console.error("GEMINI_API_KEY is not defined. Please set it in the Secrets panel.");
+}
+
+const ai = new GoogleGenAI({ apiKey: apiKey || "MISSING_API_KEY" });
 
 export async function moderateContent(text: string): Promise<{ isSafe: boolean; reason?: string }> {
   try {
@@ -26,7 +41,7 @@ export async function moderateContent(text: string): Promise<{ isSafe: boolean; 
     return result;
   } catch (error) {
     console.error("Moderation error:", error);
-    return { isSafe: true }; // Fallback to safe if AI fails, or implement stricter fallback
+    return { isSafe: true }; // Fallback to safe
   }
 }
 

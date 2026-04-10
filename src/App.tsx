@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { collection, query, getDocs, limit, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, query, getDocs, limit, doc, setDoc, getDoc, onSnapshot, addDoc, serverTimestamp, where, orderBy } from "firebase/firestore";
 import { Heart, Shield, Users, Sparkles, MessageCircle, CheckCircle, Send } from "lucide-react";
 
 import Layout from "./components/Layout";
@@ -18,10 +19,87 @@ import { ScrollArea } from "./components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Badge } from "./components/ui/badge";
 
-import { auth, googleProvider, signInWithPopup, db, handleFirestoreError, OperationType } from "./lib/firebase";
+import { auth, googleProvider, signInWithPopup, db, handleFirestoreError, OperationType, FirebaseUser, Timestamp, onAuthStateChanged } from "./lib/firebase";
 import { useAuth } from "./components/FirebaseProvider";
 import DiscoveryCard from "./components/DiscoveryCard";
-import { moderateContent } from "./services/geminiService";
+import { moderateContent, getCompatibilityScore } from "./services/geminiService";
+
+const Loading = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+  </div>
+);
+
+const ReportDialog = ({ reportedId, onClose }: { reportedId: string; onClose: () => void }) => {
+  const { user } = useAuth();
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !reason) return;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "reports"), {
+        reporterId: user.uid,
+        reportedId,
+        reason,
+        details,
+        createdAt: new Date().toISOString(),
+        status: "pending"
+      });
+      toast.success("Report submitted. Our safety team will review it.");
+      onClose();
+    } catch (error) {
+      toast.error("Failed to submit report.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+        <h2 className="text-2xl font-serif font-bold text-brand-900 mb-4">Report User</h2>
+        <p className="text-brand-600 text-sm mb-6">Help us keep SoulLink safe. Your report is confidential.</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label className="text-brand-700">Reason</Label>
+            <select 
+              value={reason} 
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full p-3 rounded-xl border border-brand-100 mt-1"
+              required
+            >
+              <option value="">Select a reason</option>
+              <option value="inappropriate_content">Inappropriate Content</option>
+              <option value="harassment">Harassment</option>
+              <option value="fake_profile">Fake Profile</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <Label className="text-brand-700">Details (Optional)</Label>
+            <textarea 
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              className="w-full p-3 rounded-xl border border-brand-100 mt-1 h-24"
+              placeholder="Provide more information..."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-full">Cancel</Button>
+            <Button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-600 hover:bg-brand-700 text-white rounded-full">
+              {isSubmitting ? "Submitting..." : "Submit Report"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const Home = () => (
   <div className="flex flex-col">
@@ -308,6 +386,13 @@ const Login = () => {
   );
 };
 
+const Meta = ({ title, description }: { title: string; description: string }) => (
+  <React.Fragment>
+    <title>{`${title} | SoulLink`}</title>
+    <meta name="description" content={description} />
+  </React.Fragment>
+);
+
 const Discovery = () => {
   const { user, loading: authLoading } = useAuth();
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -318,52 +403,38 @@ const Discovery = () => {
 
   useEffect(() => {
     const fetchProfiles = async () => {
+      if (!user) return;
+      setLoading(true);
       try {
-        const q = query(collection(db, "users"), limit(10));
+        const q = query(collection(db, "users"), limit(20));
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const profilesData = snapshot.docs
+          .map(doc => doc.data())
+          .filter(p => p.uid !== user.uid);
         
-        if (data.length === 0) {
-          setProfiles([
-            {
-              displayName: "Sarah Chen",
-              bio: "Passionate about sustainable tech and hiking. Looking for deep conversations about the future of our planet.",
-              interests: ["Travel", "Business", "Art"],
-              lifeGoals: "To build a startup that solves water scarcity.",
-              photoURL: "https://picsum.photos/seed/sarah/600/800",
-              compatibility: 94
-            },
-            {
-              displayName: "Marcus Thorne",
-              bio: "History buff and amateur astronomer. I believe in lifelong learning and meaningful friendships.",
-              interests: ["Study", "Gaming", "Art"],
-              lifeGoals: "To visit every historical site in Europe.",
-              photoURL: "https://picsum.photos/seed/marcus/600/800",
-              compatibility: 88
-            },
-            {
-              displayName: "Elena Rodriguez",
-              bio: "Yoga instructor and plant lover. Seeking a partner for mindful living and weekend adventures.",
-              interests: ["Fitness", "Travel", "Art"],
-              lifeGoals: "To open a community wellness center.",
-              photoURL: "https://picsum.photos/seed/elena/600/800",
-              compatibility: 82
-            }
-          ]);
-        } else {
-          setProfiles(data);
-        }
+        // Calculate compatibility for each profile
+        const profilesWithScores = await Promise.all(profilesData.map(async (p) => {
+          try {
+            const { score } = await getCompatibilityScore(user, p);
+            return { ...p, compatibility: score };
+          } catch (e) {
+            return { ...p, compatibility: 50 };
+          }
+        }));
+
+        setProfiles(profilesWithScores);
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, "users");
+        toast.error("Failed to load profiles.");
       } finally {
         setLoading(false);
       }
     };
 
-    if (!authLoading) fetchProfiles();
-  }, [authLoading]);
+    if (!authLoading && user) fetchProfiles();
+    else if (!authLoading && !user) setLoading(false);
+  }, [authLoading, user]);
 
-  if (authLoading || loading) return <div className="p-20 text-center font-serif text-2xl text-brand-400">Finding connections...</div>;
+  if (authLoading || loading) return <Loading />;
   if (!user) return <Login />;
 
   const filteredProfiles = category === "All" 
@@ -372,6 +443,7 @@ const Discovery = () => {
 
   return (
     <div className="container mx-auto px-4 py-12">
+      <Meta title="Discovery" description="Find meaningful connections based on shared values and life goals." />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <div>
           <h1 className="text-4xl font-serif font-bold text-brand-900 mb-2">Discover Connections</h1>
@@ -393,16 +465,31 @@ const Discovery = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {filteredProfiles.map((profile, i) => (
+        {filteredProfiles.length > 0 ? filteredProfiles.map((profile, i) => (
           <DiscoveryCard 
-            key={i} 
+            key={profile.uid || i} 
             user={profile} 
-            onConnect={() => {
-              toast.success(`Connection request sent to ${profile.displayName}!`);
-              return "";
+            onConnect={async () => {
+              if (!user) return;
+              try {
+                const matchId = [user.uid, profile.uid].sort().join("_");
+                await setDoc(doc(db, "matches", matchId), {
+                  users: [user.uid, profile.uid],
+                  createdAt: new Date().toISOString(),
+                  lastMessage: "",
+                  lastMessageAt: new Date().toISOString()
+                });
+                toast.success(`Connection request sent to ${profile.displayName}!`);
+              } catch (error) {
+                toast.error("Failed to connect.");
+              }
             }} 
           />
-        ))}
+        )) : (
+          <div className="col-span-full text-center py-20">
+            <p className="text-brand-400 text-lg">No profiles found in this category yet.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -413,15 +500,45 @@ const Chat = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isModerating, setIsModerating] = useState(false);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [showReport, setShowReport] = useState(false);
 
-  const mockMessages = [
-    { id: 1, senderId: "other", text: "Hi! I saw your profile and loved your life goals.", createdAt: new Date() },
-    { id: 2, senderId: "me", text: "Thanks! I'm really passionate about sustainable tech.", createdAt: new Date() },
-  ];
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch matches
+    const q = query(collection(db, "matches"), where("users", "array-contains", user.uid));
+    const unsubscribeMatches = onSnapshot(q, (snapshot) => {
+      const matchesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMatches(matchesData);
+      if (matchesData.length > 0 && !selectedMatch) {
+        setSelectedMatch(matchesData[0]);
+      }
+    });
+
+    return () => unsubscribeMatches();
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedMatch) return;
+
+    // Fetch messages for selected match
+    const q = query(
+      collection(db, "matches", selectedMatch.id, "messages"),
+      orderBy("createdAt", "asc")
+    );
+    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+      const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMessages(messagesData);
+    });
+
+    return () => unsubscribeMessages();
+  }, [selectedMatch]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || isModerating) return;
+    if (!newMessage.trim() || isModerating || !selectedMatch || !user) return;
 
     setIsModerating(true);
     try {
@@ -431,9 +548,14 @@ const Chat = () => {
         return;
       }
 
-      setMessages([...messages, { id: Date.now(), senderId: "me", text: newMessage, createdAt: new Date() }]);
+      await addDoc(collection(db, "matches", selectedMatch.id, "messages"), {
+        senderId: user.uid,
+        text: newMessage,
+        createdAt: serverTimestamp(),
+        isModerated: true
+      });
+      
       setNewMessage("");
-      toast.success("Message sent!");
     } catch (error) {
       toast.error("Failed to send message.");
     } finally {
@@ -445,85 +567,109 @@ const Chat = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 h-[calc(100vh-120px)] flex gap-6">
+      {showReport && selectedMatch && (
+        <ReportDialog 
+          reportedId={selectedMatch.users.find((id: string) => id !== user.uid)} 
+          onClose={() => setShowReport(false)} 
+        />
+      )}
+      
       <div className="hidden md:flex flex-col w-80 bg-white rounded-3xl border border-brand-100 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-brand-50">
           <h2 className="text-xl font-serif font-bold text-brand-900">Messages</h2>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-2">
-            {[
-              { name: "Sarah Chen", lastMsg: "That sounds amazing!", time: "2m ago", active: true },
-              { name: "Marcus Thorne", lastMsg: "Have you seen the new...", time: "1h ago", active: false },
-            ].map((chat, i) => (
-              <div key={i} className={`p-4 rounded-2xl cursor-pointer transition-colors ${chat.active ? 'bg-brand-50 border border-brand-100' : 'hover:bg-brand-50'}`}>
+            {matches.length > 0 ? matches.map((match) => (
+              <div 
+                key={match.id} 
+                onClick={() => setSelectedMatch(match)}
+                className={`p-4 rounded-2xl cursor-pointer transition-colors ${selectedMatch?.id === match.id ? 'bg-brand-50 border border-brand-100' : 'hover:bg-brand-50'}`}
+              >
                 <div className="flex items-center gap-3">
                   <Avatar>
-                    <AvatarImage src={`https://picsum.photos/seed/${chat.name}/100`} />
-                    <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                    <AvatarImage src={`https://picsum.photos/seed/${match.id}/100`} />
+                    <AvatarFallback>U</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center">
-                      <p className="font-bold text-brand-900 truncate">{chat.name}</p>
-                      <span className="text-[10px] text-brand-400">{chat.time}</span>
+                      <p className="font-bold text-brand-900 truncate">Connection</p>
                     </div>
-                    <p className="text-xs text-brand-500 truncate">{chat.lastMsg}</p>
+                    <p className="text-xs text-brand-500 truncate">{match.lastMessage || "Start a conversation"}</p>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-center text-brand-400 text-sm mt-8">No matches yet. Keep exploring!</p>
+            )}
           </div>
         </ScrollArea>
       </div>
 
       <div className="flex-1 flex flex-col bg-white rounded-3xl border border-brand-100 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-brand-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar>
-              <AvatarImage src="https://picsum.photos/seed/sarah/100" />
-              <AvatarFallback>S</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-bold text-brand-900">Sarah Chen</p>
-              <p className="text-[10px] text-brand-400 uppercase tracking-wider font-bold">Online</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" className="text-brand-400 hover:text-brand-600">
-            <Shield className="w-5 h-5" />
-          </Button>
-        </div>
-
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-4">
-            {[...mockMessages, ...messages].map((msg) => (
-              <div key={msg.id} className={`flex ${msg.senderId === 'me' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] p-4 rounded-2xl text-sm ${
-                  msg.senderId === 'me' 
-                    ? 'bg-brand-600 text-white rounded-tr-none' 
-                    : 'bg-brand-50 text-brand-900 rounded-tl-none border border-brand-100'
-                }`}>
-                  {msg.text}
+        {selectedMatch ? (
+          <>
+            <div className="p-4 border-b border-brand-50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src={`https://picsum.photos/seed/${selectedMatch.id}/100`} />
+                  <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-bold text-brand-900">Connection</p>
+                  <p className="text-[10px] text-brand-400 uppercase tracking-wider font-bold">Active</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </ScrollArea>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setShowReport(true)}
+                className="text-brand-400 hover:text-red-500"
+              >
+                <Shield className="w-5 h-5" />
+              </Button>
+            </div>
 
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-brand-50 flex gap-3">
-          <Input 
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a respectful message..."
-            className="flex-1 rounded-full bg-brand-50 border-none focus-visible:ring-brand-500"
-            disabled={isModerating}
-          />
-          <Button 
-            type="submit" 
-            disabled={isModerating}
-            className="bg-brand-600 hover:bg-brand-700 text-white rounded-full w-12 h-12 p-0 flex items-center justify-center"
-          >
-            {isModerating ? <Sparkles className="w-5 h-5 animate-pulse" /> : <Send className="w-5 h-5" />}
-          </Button>
-        </form>
+            <ScrollArea className="flex-1 p-6">
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[70%] p-4 rounded-2xl text-sm ${
+                      msg.senderId === user.uid 
+                        ? 'bg-brand-600 text-white rounded-tr-none' 
+                        : 'bg-brand-50 text-brand-900 rounded-tl-none border border-brand-100'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-brand-50 flex gap-3">
+              <Input 
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a respectful message..."
+                className="flex-1 rounded-full bg-brand-50 border-none focus-visible:ring-brand-500"
+                disabled={isModerating}
+              />
+              <Button 
+                type="submit" 
+                disabled={isModerating}
+                className="bg-brand-600 hover:bg-brand-700 text-white rounded-full w-12 h-12 p-0 flex items-center justify-center"
+              >
+                {isModerating ? <Sparkles className="w-5 h-5 animate-pulse" /> : <Send className="w-5 h-5" />}
+              </Button>
+            </form>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <MessageCircle className="w-16 h-16 text-brand-100 mb-4" />
+            <h3 className="text-xl font-serif font-bold text-brand-900 mb-2">Your Conversations</h3>
+            <p className="text-brand-600 max-w-xs">Select a match from the sidebar to start chatting meaningfully.</p>
+          </div>
+        )}
       </div>
     </div>
   );

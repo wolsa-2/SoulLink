@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ interface DiscoveryCardProps {
   onConnect: () => void;
 }
 
-export default function DiscoveryCard({ user, onConnect }: DiscoveryCardProps) {
+const DiscoveryCard: React.FC<DiscoveryCardProps> = ({ user, onConnect }) => {
   return (
     <Card className="overflow-hidden rounded-3xl border-brand-100 shadow-sm hover:shadow-md transition-all group">
       <div className="relative aspect-[4/5] overflow-hidden bg-brand-100">
@@ -82,3 +82,5 @@ export default function DiscoveryCard({ user, onConnect }: DiscoveryCardProps) {
     </Card>
   );
 }
+
+export default DiscoveryCard;
