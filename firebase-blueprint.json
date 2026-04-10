@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile on SoulLink.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user." },
+        "displayName": { "type": "string", "description": "User's display name." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "photoURL": { "type": "string", "format": "uri", "description": "User's profile picture URL." },
+        "bio": { "type": "string", "description": "A short biography." },
+        "interests": { "type": "array", "items": { "type": "string" }, "description": "List of interests (e.g., Travel, Business)." },
+        "lifeGoals": { "type": "string", "description": "User's life goals and aspirations." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
+        "lastActive": { "type": "string", "format": "date-time", "description": "Last time the user was active." },
+        "isVerified": { "type": "boolean", "description": "Whether the profile is verified." }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A connection between two users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "users": { "type": "array", "items": { "type": "string" }, "description": "Array of the two user UIDs." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["users", "createdAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isModerated": { "type": "boolean", "description": "Whether the message passed AI moderation." }
+      },
+      "required": ["senderId", "text", "createdAt"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "An article for the blog section.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "content": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "author": { "type": "string" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["title", "slug", "content", "publishedAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A safety report filed by a user.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "reportedId": { "type": "string" },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved"] }
+      },
+      "required": ["reporterId", "reportedId", "reason", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Match metadata."
+    },
+    "/matches/{matchId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a match."
+    },
+    "/blogPosts/{postId}": {
+      "schema": "BlogPost",
+      "description": "Blog articles for SEO and content."
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Safety reports."
+    }
+  }
+}
