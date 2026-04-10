@@ -695,6 +695,8 @@ const Profile = () => {
             photoURL: user.photoURL,
             bio: "",
             interests: [],
+            skills: [],
+            personalityTraits: [],
             lifeGoals: "",
             createdAt: new Date().toISOString(),
             isVerified: false
@@ -776,6 +778,33 @@ const Profile = () => {
                   className="w-full p-3 rounded-xl border border-brand-100 focus:ring-2 focus:ring-brand-500 outline-none h-24 text-sm"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Interests / Hobbies (comma separated)</Label>
+                <Input 
+                  value={profile.interests?.join(", ")} 
+                  onChange={(e) => setProfile({...profile, interests: e.target.value.split(",").map(s => s.trim()).filter(s => s !== "")})}
+                  placeholder="Travel, Cooking, Hiking..."
+                  className="rounded-xl border-brand-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Skills (comma separated)</Label>
+                <Input 
+                  value={profile.skills?.join(", ")} 
+                  onChange={(e) => setProfile({...profile, skills: e.target.value.split(",").map(s => s.trim()).filter(s => s !== "")})}
+                  placeholder="Coding, Photography, Public Speaking..."
+                  className="rounded-xl border-brand-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Personality Traits (comma separated)</Label>
+                <Input 
+                  value={profile.personalityTraits?.join(", ")} 
+                  onChange={(e) => setProfile({...profile, personalityTraits: e.target.value.split(",").map(s => s.trim()).filter(s => s !== "")})}
+                  placeholder="Introvert, Creative, Empathetic..."
+                  className="rounded-xl border-brand-100"
+                />
+              </div>
               <Button type="submit" className="w-full bg-brand-600 hover:bg-brand-700 text-white py-6 rounded-xl">
                 Save Changes
               </Button>
@@ -793,9 +822,25 @@ const Profile = () => {
               <div className="space-y-2">
                 <h3 className="text-xs uppercase tracking-wider font-bold text-brand-400">Interests</h3>
                 <div className="flex flex-wrap gap-2">
-                  {profile.interests.length > 0 ? profile.interests.map((int: string) => (
+                  {profile.interests?.length > 0 ? profile.interests.map((int: string) => (
                     <Badge key={int} className="bg-brand-50 text-brand-700 border-brand-100">{int}</Badge>
                   )) : <p className="text-brand-400 text-sm italic">No interests added.</p>}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs uppercase tracking-wider font-bold text-brand-400">Skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills?.length > 0 ? profile.skills.map((skill: string) => (
+                    <Badge key={skill} className="bg-brand-100 text-brand-800 border-brand-200">{skill}</Badge>
+                  )) : <p className="text-brand-400 text-sm italic">No skills added.</p>}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs uppercase tracking-wider font-bold text-brand-400">Personality Traits</h3>
+                <div className="flex flex-wrap gap-2">
+                  {profile.personalityTraits?.length > 0 ? profile.personalityTraits.map((trait: string) => (
+                    <Badge key={trait} className="bg-brand-200 text-brand-900 border-brand-300">{trait}</Badge>
+                  )) : <p className="text-brand-400 text-sm italic">No traits added.</p>}
                 </div>
               </div>
             </div>

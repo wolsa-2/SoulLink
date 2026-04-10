@@ -9,6 +9,8 @@ interface DiscoveryCardProps {
     displayName: string;
     bio: string;
     interests: string[];
+    skills?: string[];
+    personalityTraits?: string[];
     lifeGoals: string;
     photoURL?: string;
     compatibility?: number;
@@ -46,16 +48,21 @@ const DiscoveryCard: React.FC<DiscoveryCardProps> = ({ user, onConnect }) => {
         <p className="text-brand-700 text-sm line-clamp-2 mb-4">{user.bio}</p>
         
         <div className="flex flex-wrap gap-2 mb-4">
-          {user.interests.slice(0, 3).map((interest) => (
-            <Badge key={interest} variant="secondary" className="bg-brand-100 text-brand-700 hover:bg-brand-200 border-none">
+          {user.interests.slice(0, 2).map((interest) => (
+            <Badge key={interest} variant="secondary" className="bg-brand-100 text-brand-700 border-none">
               {interest}
             </Badge>
           ))}
-          {user.interests.length > 3 && (
-            <Badge variant="secondary" className="bg-brand-50 text-brand-400 border-none">
-              +{user.interests.length - 3}
+          {user.skills?.slice(0, 1).map((skill) => (
+            <Badge key={skill} variant="secondary" className="bg-blue-50 text-blue-700 border-none">
+              {skill}
             </Badge>
-          )}
+          ))}
+          {user.personalityTraits?.slice(0, 1).map((trait) => (
+            <Badge key={trait} variant="secondary" className="bg-purple-50 text-purple-700 border-none">
+              {trait}
+            </Badge>
+          ))}
         </div>
         
         <div className="space-y-1">
